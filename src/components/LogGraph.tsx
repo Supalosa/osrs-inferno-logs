@@ -79,7 +79,7 @@ const ALL_SPLITS = [...SPLIT_WAVES, 'last'];
 
 export const LogGraph = ({ logs }: { logs: Log[] }) => {
   const defaultMaxTime = useMemo(() => Math.floor(getMaxDuration(logs) / 300) * 300, [logs]);
-  const [showLine, setShowLine] = useState(true);
+  const [showLine, setShowLine] = useState(false);
   const [maxTime, setMaxTime] = useState(defaultMaxTime);
   const [splits, setShowSplits] = useState(true);
   const [selectedWaves, setSelectedWaves] = useState<{ [wave: string]: boolean }>(
