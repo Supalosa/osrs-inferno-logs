@@ -5,9 +5,9 @@ export function ColorSchemeToggle() {
 
   return (
     <Group justify="center" mt="xl">
-      <Button onClick={() => setColorScheme('light')}>Light</Button>
-      <Button onClick={() => setColorScheme('dark')}>Dark</Button>
-      <Button onClick={() => setColorScheme('auto')}>Auto</Button>
+      <Button size="compact-md" onClick={() => setColorScheme('light')}>Light</Button>
+      <Button size="compact-md" onClick={() => setColorScheme('dark')}>Dark</Button>
+      <Button size="compact-md" onClick={() => setColorScheme('auto')}>Auto</Button>
     </Group>
   );
 }
