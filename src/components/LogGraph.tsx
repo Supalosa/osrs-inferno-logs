@@ -90,7 +90,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
   const parsedData = useMemo(() => toChartData(logs, splits), [logs, splits]);
 
   return (
-    <Flex direction="column" gap="md">
+    <Flex direction="column" gap="md" ml="lg" mr="lg">
       <Group>
         <Paper shadow="xs" withBorder p="xs">
           <Checkbox checked={showLine} onChange={() => setShowLine(!showLine)} label="Show Line" />
@@ -115,7 +115,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
         <Paper shadow="xs" withBorder p="xs">
           <Group>
             {ALL_SPLITS.map((wave, i) => (
-              <>
+              <Group>
                 <Checkbox
                   key={i}
                   checked={selectedWaves[wave]}
@@ -132,7 +132,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
                   onClick={() => {
                     // set all others to false, unless we are the only one, in which case set everything to true
                     const othersOn = Object.entries(selectedWaves)
-                      .filter(([k, v]) => v)
+                      .filter(([, v]) => v)
                       .some(([k]) => k !== wave);
                     if (othersOn) {
                       setSelectedWaves(
@@ -143,9 +143,9 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
                     }
                   }}
                 >
-                  {wave === 'last' ? (splits ? 'Successs' : 'Zuk') : `Wave ${wave}`}
+                  {wave === 'last' ? (splits ? 'Success' : 'Zuk') : wave}
                 </Button>
-              </>
+              </Group>
             ))}
           </Group>
         </Paper>
@@ -157,7 +157,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
         dataKey="run"
         series={SPLIT_WAVES.map((wave, i) => ({
           name: wave,
-          label: `Wave ${wave} ${splits ? 'Split' : 'Delta'}`,
+          label: `${wave} ${splits ? 'Split' : 'Delta'}`,
           color: SPLIT_WAVE_COLORS[i],
         }))
           .concat({

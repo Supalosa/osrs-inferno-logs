@@ -72,13 +72,12 @@ export function LogsPage({ onSetLogs }: { onSetLogs: (logs: File[]) => void }) {
   return (
     <>
       <LogUploader minHeight={100} onSetLogs={onSetLogs} />
-      Parsed {parsedLogs.length} logs:
       {parsedLogs.length > 0 && (
         <LogGraph logs={parsedLogs} />
       )}
       <Divider />
-      <Button size="sm" onClick={() => setShowLogs((s) => !s)}>
-        {showLogs ? 'hide' : 'show'} all logs
+      <Button size="sm" onClick={() => setShowLogs((s) => !s)} mt="lg">
+        {showLogs ? 'hide' : 'show'} all {parsedLogs.length} logs
       </Button>
       <Collapse in={showLogs}>
         <Table>
