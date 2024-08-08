@@ -173,7 +173,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
         }
         dotProps={{ r: 3 }}
         lineProps={{ strokeWidth: showLine ? 1 : 0 }}
-        yAxisProps={{ tickCount: 10, domain: [0, () => maxTime] }}
+        yAxisProps={{ tickCount: 11, domain: [0, () => maxTime] }}
         withLegend
         legendProps={{ verticalAlign: 'bottom' }}
       />
