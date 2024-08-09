@@ -7,9 +7,12 @@ import { Log, LogGraph, SPLIT_WAVES } from '@/components/LogGraph';
 
 const parseLog = async (file: File): Promise<Log> => {
   const { name } = file;
-  const date = name.substring(0, 19);
+  const dateTime = name.substring(0, 19);
   const lastWave = name.match(/on Wave (\d+)/)?.[1] ?? 'unknown';
   const contents = await file.text();
+
+  // 2020-10-10 10-10-10
+  const date = new Date(`${dateTime.substring(0, 10)}T${dateTime.substring(11, 21).replaceAll('-', ':')}`);
 
   const toSeconds = (timestamp: string | undefined) => {
     if (!timestamp) {
@@ -93,7 +96,7 @@ export function LogsPage({ onSetLogs }: { onSetLogs: (logs: File[]) => void }) {
           <Table.Tbody>
             {parsedLogs.map(({ date, lastWave, splits, deltas }, i) => (
               <Table.Tr key={i}>
-                <Table.Td>{date}</Table.Td>
+                <Table.Td>{date.toString()}</Table.Td>
                 <Table.Td>{lastWave}</Table.Td>
                 {SPLIT_WAVES.map((wave) => (
                   <Table.Td>
