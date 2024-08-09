@@ -12,25 +12,10 @@ import {
   Text,
   useMantineColorScheme,
 } from '@mantine/core';
-import { useMemo, useState } from 'react';
-
-export const SPLIT_WAVES = [
-  '9',
-  '18',
-  '25',
-  '35',
-  '42',
-  '50',
-  '57',
-  '60',
-  '63',
-  '66',
-  '67',
-  '68',
-  '69',
-];
+import { useEffect, useMemo, useState } from 'react';
 
 export const SPLIT_WAVE_COLORS: { [wave: string]: string } = {
+  /* inferno */
   '9': 'cyan',
   '18': 'teal',
   '25': 'green',
@@ -44,6 +29,14 @@ export const SPLIT_WAVE_COLORS: { [wave: string]: string } = {
   '67': 'indigo',
   '68': 'blue',
   '69': 'violet',
+  /* fight caves */
+  '7': 'cyan',
+  '15': 'teal',
+  '31': 'green',
+  '46': 'lime',
+  '53': 'yellow',
+  '61': 'orange',
+  '62': 'red',
 };
 
 export type Splits = { [wave: string]: number | null };
@@ -64,24 +57,21 @@ const calculateZukTime = (success: boolean, duration: number, splits: Splits): n
 
   return duration - splits['69'];
 };
-/*
-const toChartData = (parsedLogs: Log[], showSplits: boolean) =>
-  parsedLogs.map(({ splits, deltas, success, duration, date }, run) => ({
-    ...(showSplits && splits),
-    ...(!showSplits && deltas),
-    ...(success && { last: duration }),
-    ...(!showSplits && { last: calculateZukTime(success, duration, splits) }),
-    run,
-    date: date.getTime(),
-  }));
-*/
+
+const toUniqueWaves = (logs: Log[]) => {
+  const waves = new Set<string>();
+  logs.forEach(({ splits }) => {
+    Object.keys(splits).forEach((wave) => waves.add(wave));
+  });
+  return Array.from(waves);
+};
+
 const toChartData = (
   parsedLogs: Log[],
   selectedWaves: { [wave: string]: boolean },
   colorScheme: string
 ) => {
-  // TODO get waves from data instead
-  const waveList = SPLIT_WAVES.filter((wave) => !!selectedWaves[wave]);
+  const waveList = Object.keys(selectedWaves);
   const waveToSeries: { [wave: string]: ScatterChartSeries } = {};
   const getOrCreateSeries = (wave: string, defaultColor: string = 'black') => {
     if (waveToSeries[wave]) {
@@ -124,8 +114,6 @@ const toChartData = (
 const getMaxDuration = (logs: Log[]) =>
   logs.map(({ duration }) => duration).reduce((a, b) => Math.max(a, b), 0);
 
-const ALL_SPLITS = [...SPLIT_WAVES, 'last'];
-
 const CustomTooltip = ({ active, payload, formatter }: {
   active?: boolean;
   payload?: any;
@@ -160,10 +148,19 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
   const [useDate, setUseDate] = useState(false);
   const [maxTime, setMaxTime] = useState(defaultMaxTime);
   const [splits, setShowSplits] = useState(true);
-  const [selectedWaves, setSelectedWaves] = useState<{ [wave: string]: boolean }>(
-    ALL_SPLITS.reduce((acc, wave) => ({ ...acc, [wave]: true }), {})
-  );
+  const [selectedWaves, setSelectedWaves] = useState<{ [wave: string]: boolean }>({});
+  const [allWaves, setAllWaves] = useState<string[]>([]);
   const colorScheme = useMantineColorScheme();
+
+  useEffect(() => {
+    const uniqueWaves = toUniqueWaves(logs);
+    setSelectedWaves(
+      uniqueWaves.reduce((acc, wave) => ({ ...acc, [wave]: true }), {
+        last: true,
+      })
+    );
+    setAllWaves(uniqueWaves.concat('last'));
+  }, [logs]);
 
   const parsedData = useMemo(
     () => toChartData(logs, selectedWaves, colorScheme.colorScheme),
@@ -206,7 +203,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
         </Paper>
         <Paper shadow="xs" withBorder p="xs">
           <Group>
-            {ALL_SPLITS.map((wave, i) => (
+            {allWaves.map((wave, i) => (
               <Paper withBorder p="xs">
                 <Group>
                   <Checkbox
@@ -229,11 +226,11 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
                         .some(([k]) => k !== wave);
                       if (othersOn) {
                         setSelectedWaves(
-                          ALL_SPLITS.reduce((acc, w) => ({ ...acc, [w]: w === wave }), {})
+                          allWaves.reduce((acc, w) => ({ ...acc, [w]: w === wave }), {})
                         );
                       } else {
                         setSelectedWaves(
-                          ALL_SPLITS.reduce((acc, w) => ({ ...acc, [w]: true }), {})
+                          allWaves.reduce((acc, w) => ({ ...acc, [w]: true }), {})
                         );
                       }
                     }}

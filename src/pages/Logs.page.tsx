@@ -1,9 +1,8 @@
 /* eslint-disable quote-props */
 import { useContext, useEffect, useState } from 'react';
-import { Button, Collapse, Divider, Table } from '@mantine/core';
 import { LogUploader } from '@/components/LogUploader';
 import { LogsContext } from '@/context/LogsContext';
-import { Log, LogGraph, SPLIT_WAVES } from '@/components/LogGraph';
+import { Log, LogGraph } from '@/components/LogGraph';
 
 const parseLog = async (file: File): Promise<Log> => {
   const { name } = file;
@@ -26,17 +25,22 @@ const parseLog = async (file: File): Promise<Log> => {
   const success = durationLine?.[1] === 'Success';
   const duration = toSeconds(durationLine?.[2])!;
 
+  const waves = [];
+  for (const wave of contents.matchAll(/Wave: (\d+)/g)) {
+    waves.push(wave[1]);
+  }
+
   return {
     date,
     lastWave,
-    splits: SPLIT_WAVES.reduce(
+    splits: waves.reduce(
       (acc, wave) => ({
         ...acc,
         [wave]: toSeconds(contents.match(new RegExp(`Wave: ${wave}, Split: ([\\d:]+)`))?.[1]),
       }),
       {}
     ),
-    deltas: SPLIT_WAVES.reduce(
+    deltas: waves.reduce(
       (acc, wave) => ({
         ...acc,
         [wave]: toSeconds(
@@ -53,7 +57,6 @@ const parseLog = async (file: File): Promise<Log> => {
 const parseLogs = async (file: File[]): Promise<Log[]> => Promise.all(file.map(parseLog));
 
 export function LogsPage({ onSetLogs }: { onSetLogs: (logs: File[]) => void }) {
-  const [showLogs, setShowLogs] = useState(false);
   const [parsedLogs, setParsedLogs] = useState<Log[]>([]);
   const logs = useContext(LogsContext);
 
@@ -78,40 +81,6 @@ export function LogsPage({ onSetLogs }: { onSetLogs: (logs: File[]) => void }) {
       {parsedLogs.length > 0 && (
         <LogGraph logs={parsedLogs} />
       )}
-      <Divider />
-      <Button size="sm" onClick={() => setShowLogs((s) => !s)} mt="lg">
-        {showLogs ? 'hide' : 'show'} all {parsedLogs.length} logs
-      </Button>
-      <Collapse in={showLogs}>
-        <Table>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Date</Table.Th>
-              <Table.Th>Last Wave</Table.Th>
-              {SPLIT_WAVES.map((wave) => (
-                <Table.Th>W{wave}</Table.Th>
-              ))}
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {parsedLogs.map(({ date, lastWave, splits, deltas }, i) => (
-              <Table.Tr key={i}>
-                <Table.Td>{date.toString()}</Table.Td>
-                <Table.Td>{lastWave}</Table.Td>
-                {SPLIT_WAVES.map((wave) => (
-                  <Table.Td>
-                    {splits[wave] && (
-                      <>
-                        {splits[wave]} (+{deltas[wave]})
-                      </>
-                    )}
-                  </Table.Td>
-                ))}
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      </Collapse>
     </>
   );
 }
