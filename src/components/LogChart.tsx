@@ -1,13 +1,18 @@
 import { CompositeChart, ScatterChart, ScatterChartSeries } from '@mantine/charts';
 import { useMemo } from 'react';
 import { useMantineColorScheme } from '@mantine/core';
-import { Log, SPLIT_WAVE_COLORS, Splits } from '@/consts';
+import { LINE_TYPES, Log, SPLIT_WAVE_COLORS, Splits } from '@/consts';
 
-const calculateZukTime = (success: boolean, duration: number, splits: Splits): number | null => {
-  if (!success || !splits['69']) {
+const calculateLastWaveTime = (
+  success: boolean,
+  duration: number,
+  splits: Splits
+): number | null => {
+  const lastWave = Object.keys(splits)[Object.keys(splits).length - 1];
+  if (!success || !splits[lastWave]) {
     return null;
   }
-  return duration - splits['69'];
+  return duration - splits[lastWave];
 };
 
 const toScatterChartData = (
@@ -52,7 +57,7 @@ const toScatterChartData = (
     if (selectedWaves.last && success && duration < maxTimeSeconds) {
       getOrCreateSeries('last', colorScheme === 'dark' ? 'white' : 'black').data.push({
         split: duration,
-        delta: calculateZukTime(success, duration, splits)!,
+        delta: calculateLastWaveTime(success, duration, splits)!,
         run,
         date: dateTime,
       });
@@ -61,22 +66,58 @@ const toScatterChartData = (
   return Object.values(waveToSeries);
 };
 
+const processSplits = (parsedLogs: Log[], lineType: string) => {
+  const pbSplits: { [wave: string]: number } = {};
+  const pbDeltas: { [wave: string]: number } = {};
+  let pbSuccess: number = Number.MAX_SAFE_INTEGER;
+  switch (lineType) {
+    case LINE_TYPES.PB:
+      return parsedLogs.map(({ splits, deltas, success, duration }) => {
+        const newSplits: { [wave: string]: number } = {};
+        const newDeltas: { [wave: string]: number } = {};
+        // only add an entry if we actually pb'd a split/delta
+        Object.entries(splits).forEach(([wave, time]) => {
+          if (time && (!pbSplits[wave] || time < pbSplits[wave])) {
+            newSplits[wave] = time;
+            pbSplits[wave] = time;
+          }
+        });
+        Object.entries(deltas).forEach(([wave, time]) => {
+          if (time && (!pbDeltas[wave] || time < pbDeltas[wave])) {
+            newDeltas[wave] = time;
+            pbDeltas[wave] = time;
+          }
+        });
+        if (success && (!pbSuccess || duration < pbSuccess)) {
+          pbSuccess = duration;
+        }
+        return { success, duration: pbSuccess, splits: newSplits, deltas: newDeltas };
+      });
+    case LINE_TYPES.RUN:
+    default:
+      return parsedLogs;
+  }
+};
+
 const toLineChartData = (
   parsedLogs: Log[],
   showSplits: boolean,
+  lineType: string,
   minRunLength: number,
   maxRunLength: number
-) =>
-  parsedLogs
-    .filter(({ duration }) => duration >= minRunLength && duration <= maxRunLength)
-    .map(({ splits, deltas, success, duration }, run) => ({
-      ...(showSplits && splits),
-      ...(!showSplits && deltas),
-      ...(success && { last: duration }),
-      ...(!showSplits && { last: calculateZukTime(success, duration, splits) }),
-      run,
-    }));
-
+) => {
+  const processedLogs = processSplits(
+    parsedLogs.filter(({ duration }) => duration >= minRunLength && duration <= maxRunLength),
+    lineType
+  );
+  return processedLogs.map(({ splits, deltas, success, duration }, run) => ({
+    ...(showSplits && splits),
+    ...(!showSplits && deltas),
+    ...(success && { last: duration }),
+    ...(!showSplits && { last: calculateLastWaveTime(success, duration, splits) }),
+    run,
+  }));
+};
 type LogChartProps = {
   logs: Log[];
   selectedWaves: { [wave: string]: boolean };
@@ -84,6 +125,7 @@ type LogChartProps = {
   maxTime: number;
   useDate: boolean;
   splits: boolean;
+  lineType: string;
 };
 
 export const LogChart = ({
@@ -93,6 +135,7 @@ export const LogChart = ({
   maxTime,
   useDate,
   splits,
+  lineType,
 }: LogChartProps) => {
   const colorScheme = useMantineColorScheme();
 
@@ -113,8 +156,8 @@ export const LogChart = ({
     [useDate, logs, minRunLength, maxRunLength, colorScheme, selectedWaves]
   );
   const parsedLineData = useMemo(
-    () => (!useDate ? toLineChartData(logs, splits, minRunLength, maxRunLength) : []),
-    [logs, minRunLength, maxRunLength, colorScheme, selectedWaves]
+    () => (!useDate ? toLineChartData(logs, splits, lineType, minRunLength, maxRunLength) : []),
+    [logs, lineType, minRunLength, maxRunLength, colorScheme, selectedWaves]
   );
   const uniqueWaves = Object.keys(selectedWaves);
   const lineChartSeries = uniqueWaves

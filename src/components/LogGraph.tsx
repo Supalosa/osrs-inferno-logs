@@ -7,13 +7,14 @@ import {
   Group,
   Paper,
   RangeSlider,
+  Select,
   Switch,
   Text,
 } from '@mantine/core';
 import _ from 'lodash';
 import { useEffect, useMemo, useState } from 'react';
 import { LogChart } from './LogChart';
-import { Log, SPLIT_WAVE_COLORS } from '@/consts';
+import { LINE_TYPES, Log, SPLIT_WAVE_COLORS } from '@/consts';
 
 const toUniqueWaves = (logs: Log[]) => {
   const waves = new Set<string>();
@@ -30,11 +31,11 @@ const getMinDuration = (logs: Log[]) =>
   logs.map(({ duration }) => duration).reduce((a, b) => Math.min(a, b), 0);
 
 export const LogGraph = ({ logs }: { logs: Log[] }) => {
-  const [showLine, setShowLine] = useState(false);
   const [useDate, setUseDate] = useState(false);
   const [splits, setShowSplits] = useState(true);
   const [selectedWaves, setSelectedWaves] = useState<{ [wave: string]: boolean }>({});
   const [allWaves, setAllWaves] = useState<string[]>([]);
+  const [lineType, setLineType] = useState<string>(LINE_TYPES.RUN);
 
   const defaultMaxTime = useMemo(() => Math.ceil(getMaxDuration(logs) / 300) * 300, [logs]);
   const defaultMinTime = useMemo(
@@ -63,10 +64,19 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
     <Flex direction="column" gap="md" ml="lg" mr="lg">
       <Group>
         <Paper shadow="xs" withBorder p="xs">
-          <Checkbox checked={showLine} onChange={() => setShowLine(!showLine)} label="Show Line" />
+          <Checkbox checked={useDate} onChange={() => setUseDate(!useDate)} label="By Date" />
         </Paper>
         <Paper shadow="xs" withBorder p="xs">
-          <Checkbox checked={useDate} onChange={() => setUseDate(!useDate)} label="By Date" />
+          <Group>
+            <Text size="sm">Showing:</Text>
+            <Select
+              disabled={useDate}
+              value={lineType}
+              data={Object.values(LINE_TYPES)}
+              onChange={(v) => setLineType(v!)}
+              allowDeselect={false}
+            />
+          </Group>
         </Paper>
         <Paper shadow="xs" withBorder p="xs">
           <Group>
@@ -143,6 +153,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
         maxTime={maxTime}
         useDate={useDate}
         splits={splits}
+        lineType={lineType}
       />
     </Flex>
   );
