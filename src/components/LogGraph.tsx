@@ -3,15 +3,18 @@ import { ScatterChart, ScatterChartSeries } from '@mantine/charts';
 import {
   Button,
   Checkbox,
+  Container,
   Divider,
   Flex,
   Group,
   NumberInput,
   Paper,
+  RangeSlider,
   Switch,
   Text,
   useMantineColorScheme,
 } from '@mantine/core';
+import _ from 'lodash';
 import { useEffect, useMemo, useState } from 'react';
 
 export const SPLIT_WAVE_COLORS: { [wave: string]: string } = {
@@ -69,6 +72,8 @@ const toUniqueWaves = (logs: Log[]) => {
 const toChartData = (
   parsedLogs: Log[],
   selectedWaves: { [wave: string]: boolean },
+  minTimeSeconds: number,
+  maxTimeSeconds: number,
   colorScheme: string
 ) => {
   const waveList = Object.keys(selectedWaves);
@@ -91,6 +96,9 @@ const toChartData = (
       if (!selectedWaves[wave]) {
         return;
       }
+      if (value! < minTimeSeconds || value! > maxTimeSeconds) {
+        return;
+      }
       const series = getOrCreateSeries(wave);
       series.data.push({
         split: value!,
@@ -99,7 +107,8 @@ const toChartData = (
         date: dateTime,
       });
     });
-    if (selectedWaves.last && success) {
+    // add the completion time for successes only
+    if (selectedWaves.last && success && duration < maxTimeSeconds) {
       getOrCreateSeries('last', colorScheme === 'dark' ? 'white' : 'black').data.push({
         split: duration,
         delta: calculateZukTime(success, duration, splits)!,
@@ -114,7 +123,14 @@ const toChartData = (
 const getMaxDuration = (logs: Log[]) =>
   logs.map(({ duration }) => duration).reduce((a, b) => Math.max(a, b), 0);
 
-const CustomTooltip = ({ active, payload, formatter }: {
+const getMinDuration = (logs: Log[]) =>
+  logs.map(({ duration }) => duration).reduce((a, b) => Math.min(a, b), 0);
+
+const CustomTooltip = ({
+  active,
+  payload,
+  formatter,
+}: {
   active?: boolean;
   payload?: any;
   formatter: (value: number | null) => string;
@@ -143,14 +159,25 @@ const CustomTooltip = ({ active, payload, formatter }: {
 };
 
 export const LogGraph = ({ logs }: { logs: Log[] }) => {
-  const defaultMaxTime = useMemo(() => Math.floor(getMaxDuration(logs) / 300) * 300, [logs]);
   const [showLine, setShowLine] = useState(false);
   const [useDate, setUseDate] = useState(false);
-  const [maxTime, setMaxTime] = useState(defaultMaxTime);
   const [splits, setShowSplits] = useState(true);
   const [selectedWaves, setSelectedWaves] = useState<{ [wave: string]: boolean }>({});
   const [allWaves, setAllWaves] = useState<string[]>([]);
   const colorScheme = useMantineColorScheme();
+
+  const defaultMaxTime = useMemo(() => Math.ceil(getMaxDuration(logs) / 300) * 300, [logs]);
+  const defaultMinTime = useMemo(
+    () => Math.floor(getMinDuration(logs) / 300) * 300,
+    [splits, logs]
+  );
+  // because the RangeSlider is controlled, we need a value that is updated as we drag (but before onChangeEnd)
+  const [visualTimeRange, setVisualTimeRange] = useState([defaultMinTime, defaultMaxTime]);
+  const [[minTime, maxTime], setTimeRange] = useState([defaultMinTime, defaultMaxTime]);
+
+  const timeRangeMarks = (
+    splits ? _.range(defaultMinTime, defaultMaxTime + 1, 300) : _.range(0, 601, 60)
+  ).map((value) => ({ value, label: `${Math.floor(value / 60)}` }));
 
   useEffect(() => {
     const uniqueWaves = toUniqueWaves(logs);
@@ -162,12 +189,20 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
     setAllWaves(uniqueWaves.concat('last'));
   }, [logs]);
 
+  const maxRunLength = splits ? maxTime : Number.MAX_SAFE_INTEGER;
+  const minRunLength = splits ? minTime : Number.MIN_SAFE_INTEGER;
   const parsedData = useMemo(
-    () => toChartData(logs, selectedWaves, colorScheme.colorScheme),
-    [logs, colorScheme, selectedWaves]
+    () => toChartData(logs, selectedWaves, minRunLength, maxRunLength, colorScheme.colorScheme),
+    [logs, minRunLength, maxRunLength, colorScheme, selectedWaves]
   );
-  const minDate = logs.reduce((a, b) => (a.date < b.date ? a : b)).date.getTime();
-  const maxDate = logs.reduce((a, b) => (a.date > b.date ? a : b)).date.getTime();
+  const minDate = useMemo(
+    () => logs.reduce((a, b) => (a.date < b.date ? a : b)).date.getTime(),
+    [logs]
+  );
+  const maxDate = useMemo(
+    () => logs.reduce((a, b) => (a.date > b.date ? a : b)).date.getTime(),
+    [logs]
+  );
 
   const yFormatter = (value: number | null) =>
     value === null ? 'N/A' : `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
@@ -182,24 +217,31 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
           <Checkbox checked={useDate} onChange={() => setUseDate(!useDate)} label="By Date" />
         </Paper>
         <Paper shadow="xs" withBorder p="xs">
-          <NumberInput
-            label="Max Time (Mins)"
-            value={maxTime / 60}
-            onChange={(v) => setMaxTime((v as number) * 60)}
-          />
-        </Paper>
-        <Paper shadow="xs" withBorder p="xs">
           <Group>
             <Text size="sm">Delta</Text>
             <Switch
               checked={splits}
               onChange={() => {
-                setMaxTime(!splits ? defaultMaxTime : 600);
+                setTimeRange(!splits ? [defaultMinTime, defaultMaxTime] : [0, 600]);
+                setVisualTimeRange(!splits ? [defaultMinTime, defaultMaxTime] : [0, 600]);
                 setShowSplits(!splits);
               }}
               label="Splits"
             />
           </Group>
+        </Paper>
+        <Paper shadow="xs" withBorder p="xs" miw="450px">
+          <RangeSlider
+            label={(v) => Math.floor(v / 60)}
+            value={[visualTimeRange[0], visualTimeRange[1]]}
+            onChange={([min, max]) => setVisualTimeRange([min, max])}
+            onChangeEnd={([min, max]) => setTimeRange([min, max])}
+            step={splits ? 300 : 60}
+            min={splits ? defaultMinTime : 0}
+            max={splits ? defaultMaxTime : 600}
+            marks={timeRangeMarks}
+            size="sm"
+          />
         </Paper>
         <Paper shadow="xs" withBorder p="xs">
           <Group>
@@ -229,9 +271,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
                           allWaves.reduce((acc, w) => ({ ...acc, [w]: w === wave }), {})
                         );
                       } else {
-                        setSelectedWaves(
-                          allWaves.reduce((acc, w) => ({ ...acc, [w]: true }), {})
-                        );
+                        setSelectedWaves(allWaves.reduce((acc, w) => ({ ...acc, [w]: true }), {}));
                       }
                     }}
                   >
@@ -259,7 +299,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
             ? { domain: [minDate, maxDate], tickCount: 15 }
             : { domain: [0, parsedData.length], tickCount: 15 }
         }
-        yAxisProps={{ tickCount: 11, domain: [0, () => maxTime] }}
+        yAxisProps={{ tickCount: 11, domain: [() => minTime, () => maxTime] }}
         withLegend
         legendProps={{ verticalAlign: 'bottom' }}
       />
