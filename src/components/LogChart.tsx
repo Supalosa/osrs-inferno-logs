@@ -70,6 +70,7 @@ const processSplits = (parsedLogs: Log[], lineType: string) => {
   const pbSplits: { [wave: string]: number } = {};
   const pbDeltas: { [wave: string]: number } = {};
   let pbSuccess: number = Number.MAX_SAFE_INTEGER;
+  let pbLastWave: number = Number.MAX_SAFE_INTEGER;
   switch (lineType) {
     case LINE_TYPES.PB:
       return parsedLogs.map(({ splits, deltas, success, duration }) => {
@@ -88,14 +89,29 @@ const processSplits = (parsedLogs: Log[], lineType: string) => {
             pbDeltas[wave] = time;
           }
         });
-        if (success && (!pbSuccess || duration < pbSuccess)) {
+        if (success && (duration < pbSuccess)) {
           pbSuccess = duration;
+          newSplits.last = pbSuccess;
         }
-        return { success, duration: pbSuccess, splits: newSplits, deltas: newDeltas };
+        const lastWaveTime = calculateLastWaveTime(success, duration, splits)!;
+        if (lastWaveTime && (lastWaveTime < pbLastWave)) {
+          pbLastWave = lastWaveTime;
+          newDeltas.last = pbLastWave;
+        }
+        return { success, duration, splits: newSplits, deltas: newDeltas };
       });
     case LINE_TYPES.RUN:
     default:
-      return parsedLogs;
+      return parsedLogs.map(({ splits, deltas, success, duration }) => ({
+        splits: {
+          ...splits,
+          ...(success && { last: duration }),
+        },
+        deltas: {
+          ...deltas,
+          last: calculateLastWaveTime(success, duration, splits),
+        },
+      }));
   }
 };
 
@@ -110,11 +126,9 @@ const toLineChartData = (
     parsedLogs.filter(({ duration }) => duration >= minRunLength && duration <= maxRunLength),
     lineType
   );
-  return processedLogs.map(({ splits, deltas, success, duration }, run) => ({
+  return processedLogs.map(({ splits, deltas }, run) => ({
     ...(showSplits && splits),
     ...(!showSplits && deltas),
-    ...(success && { last: duration }),
-    ...(!showSplits && { last: calculateLastWaveTime(success, duration, splits) }),
     run,
   }));
 };
