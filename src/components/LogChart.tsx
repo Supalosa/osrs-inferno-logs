@@ -239,6 +239,11 @@ export const LogChart = ({
       withLegend
       legendProps={{ verticalAlign: 'bottom' }}
       xAxisLabel="Task #"
+      referenceLines={[
+        { label: 'Sub 45', y: 2700, labelPosition: 'insideBottomRight', color: 'red' },
+        { label: 'Sub 50', y: 3000, labelPosition: 'insideBottomRight', color: 'red' },
+        { label: 'Sub 65', y: 3900, labelPosition: 'insideBottomRight', color: 'red' },
+    ]}
     />
   );
 };
