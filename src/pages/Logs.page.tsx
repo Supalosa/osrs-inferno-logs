@@ -2,8 +2,8 @@
 import { useContext, useEffect, useState } from 'react';
 import { LogUploader } from '@/components/LogUploader';
 import { LogsContext } from '@/context/LogsContext';
-import { Log, LogGraph } from '@/components/LogGraph';
-import { parseStyleProps } from '@mantine/core';
+import { LogGraph } from '@/components/LogGraph';
+import { Log } from '@/consts';
 
 const parseLog = async (file: File): Promise<Log | null> => {
   const { name } = file;
@@ -18,10 +18,11 @@ const toSeconds = (timestamp: string | undefined) => {
     return null;
   }
   const parts = timestamp.replaceAll(';', ':').split(':').map(Number);
-  if (parts.length == 2) {
+  if (parts.length === 2) {
     const [minutes, seconds] = parts;
     return minutes * 60 + seconds;
-  } else if (parts.length === 3) {
+  }
+  if (parts.length === 3) {
     const [hours, minutes, seconds] = parts;
     // this is just dumb, but sometimes it looks like it writes m:s:ms instead of h:m:s
     // so anything over 10 hours is treated as minutes
@@ -29,9 +30,8 @@ const toSeconds = (timestamp: string | undefined) => {
       return hours * 60 + minutes;
     }
     return hours * 3600 + minutes * 60 + seconds;
-  } else {
-    return null;
   }
+  return null;
 };
 
 const parseInfernoTimerLogs = async (file: File): Promise<Log | null> => {
