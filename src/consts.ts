@@ -37,5 +37,4 @@ export type Log = {
 export const LINE_TYPES = {
     RUN: 'Actual time',
     PB: 'PB Improvement',
-    MOVING_AVERAGE: 'Moving Average',
 } as const;

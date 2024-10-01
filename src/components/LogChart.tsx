@@ -238,6 +238,7 @@ export const LogChart = ({
       yAxisProps={{ tickCount: 11, domain: [0, () => maxTime] }}
       withLegend
       legendProps={{ verticalAlign: 'bottom' }}
+      xAxisLabel="Task #"
     />
   );
 };
