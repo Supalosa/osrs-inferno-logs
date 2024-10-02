@@ -46,6 +46,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
   // because the RangeSlider is controlled, we need a value that is updated as we drag (but before onChangeEnd)
   const [visualTimeRange, setVisualTimeRange] = useState([defaultMinTime, defaultMaxTime]);
   const [[minTime, maxTime], setTimeRange] = useState([defaultMinTime, defaultMaxTime]);
+  const [autoZoom, setAutoZoom] = useState(true);
 
   const [excludeRunsAbove, setExcludeRunsAbove] = useState(70 * 60);
 
@@ -111,7 +112,9 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
               marks={timeRangeMarks}
               size="sm"
               flex="1"
+              disabled={autoZoom}
             />
+            <Checkbox checked={autoZoom} onChange={() => setAutoZoom(!autoZoom)} label="Auto" />
           </Group>
         </Paper>
         <Paper shadow="xs" withBorder p="xs">
@@ -175,6 +178,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
         useDate={useDate}
         splits={splits}
         lineType={lineType}
+        autoZoom={autoZoom}
       />
     </Flex>
   );

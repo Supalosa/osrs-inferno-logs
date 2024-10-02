@@ -1,7 +1,7 @@
 import { CompositeChart, ScatterChart, ScatterChartSeries } from '@mantine/charts';
-import { useMemo } from 'react';
-import { useMantineColorScheme } from '@mantine/core';
-import { LINE_TYPES, Log, SPLIT_WAVE_COLORS, Splits } from '@/consts';
+import { act, useMemo } from 'react';
+import { Flex, Text, Title, useMantineColorScheme } from '@mantine/core';
+import { LINE_TYPES, Log, SPLIT_NAMES, SPLIT_WAVE_COLORS, Splits } from '@/consts';
 
 const calculateLastWaveTime = (
   success: boolean,
@@ -92,44 +92,44 @@ const processSplits = (parsedLogs: Log[], lineType: string) => {
             _deltas[wave] = time;
           }
         });
-        if (success && (duration < pbSuccess)) {
+        if (success && duration < pbSuccess) {
           pbSuccess = duration;
           newSplits.last = pbSuccess;
         }
         const lastWaveTime = calculateLastWaveTime(success, duration, splits)!;
-        if (lastWaveTime && (lastWaveTime < pbLastWave)) {
+        if (lastWaveTime && lastWaveTime < pbLastWave) {
           pbLastWave = lastWaveTime;
           newDeltas.last = pbLastWave;
         }
         return { success, duration, splits: newSplits, deltas: newDeltas };
       });
     case LINE_TYPES.MOVING_AVERAGE:
-        return parsedLogs.map(({ splits, deltas, success, duration }, i) => {
-            if (i === 0) {
-                Object.entries(splits).forEach(([wave, time]) => {
-                    _splits[wave] = time!;
-                });
-                Object.entries(deltas).forEach(([wave, time]) => {
-                    _deltas[wave] = time!;
-                });
-                return { success, duration, splits, deltas };
-            }
+      return parsedLogs.map(({ splits, deltas, success, duration }, i) => {
+        if (i === 0) {
+          Object.entries(splits).forEach(([wave, time]) => {
+            _splits[wave] = time!;
+          });
+          Object.entries(deltas).forEach(([wave, time]) => {
+            _deltas[wave] = time!;
+          });
+          return { success, duration, splits, deltas };
+        }
 
-            const newSplits: { [wave: string]: number } = {};
-            const newDeltas: { [wave: string]: number } = {};
-            Object.entries(splits).forEach(([wave, time]) => {
-                const emaValue = time! * k + (_splits[wave] ?? time) * (1 - k);
-                newSplits[wave] = emaValue;
-                _splits[wave] = emaValue;
-            });
-            Object.entries(deltas).forEach(([wave, time]) => {
-                const emaValue = time! * k + (_deltas[wave] ?? time) * (1 - k);
-                newDeltas[wave] = emaValue;
-                _deltas[wave] = emaValue;
-            });
-
-            return { success, duration, splits: newSplits, deltas: newDeltas };
+        const newSplits: { [wave: string]: number } = {};
+        const newDeltas: { [wave: string]: number } = {};
+        Object.entries(splits).forEach(([wave, time]) => {
+          const emaValue = time! * k + (_splits[wave] ?? time) * (1 - k);
+          newSplits[wave] = emaValue;
+          _splits[wave] = emaValue;
         });
+        Object.entries(deltas).forEach(([wave, time]) => {
+          const emaValue = time! * k + (_deltas[wave] ?? time) * (1 - k);
+          newDeltas[wave] = emaValue;
+          _deltas[wave] = emaValue;
+        });
+
+        return { success, duration, splits: newSplits, deltas: newDeltas };
+      });
     case LINE_TYPES.RUN:
     default:
       return parsedLogs.map(({ splits, deltas, success, duration }) => ({
@@ -149,15 +149,24 @@ const toLineChartData = (
   parsedLogs: Log[],
   showSplits: boolean,
   lineType: string,
-  excludeRunsAbove: number
+  excludeRunsAbove: number,
+  selectedWaves: { [wave: string]: boolean }
 ) => {
   const processedLogs = processSplits(
     parsedLogs.filter(({ duration }) => duration <= excludeRunsAbove),
     lineType
   );
+  const removeUnwantedWaves = (times: any) => {
+    Object.keys(times).forEach((split) => {
+      if (!selectedWaves[split] && split in times) {
+        delete times[split];
+      }
+    });
+    return times;
+  };
   return processedLogs.map(({ splits, deltas }, run) => ({
-    ...(showSplits && splits),
-    ...(!showSplits && deltas),
+    ...(showSplits && removeUnwantedWaves(splits)),
+    ...(!showSplits && removeUnwantedWaves(deltas)),
     run,
   }));
 };
@@ -170,6 +179,7 @@ type LogChartProps = {
   useDate: boolean;
   splits: boolean;
   lineType: string;
+  autoZoom: boolean;
 };
 
 export const LogChart = ({
@@ -181,6 +191,7 @@ export const LogChart = ({
   useDate,
   splits,
   lineType,
+  autoZoom,
 }: LogChartProps) => {
   const colorScheme = useMantineColorScheme();
 
@@ -190,17 +201,13 @@ export const LogChart = ({
   const parsedScatterData = useMemo(
     () =>
       useDate
-        ? toScatterChartData(
-            logs,
-            selectedWaves,
-            excludeRunsAbove,
-            colorScheme.colorScheme
-          )
+        ? toScatterChartData(logs, selectedWaves, excludeRunsAbove, colorScheme.colorScheme)
         : [],
     [useDate, logs, minRunLength, maxRunLength, colorScheme, selectedWaves]
   );
   const parsedLineData = useMemo(
-    () => (!useDate ? toLineChartData(logs, splits, lineType, excludeRunsAbove) : []),
+    () =>
+      !useDate ? toLineChartData(logs, splits, lineType, excludeRunsAbove, selectedWaves) : [],
     [logs, lineType, minRunLength, maxRunLength, colorScheme, selectedWaves]
   );
   const uniqueWaves = Object.keys(selectedWaves);
@@ -238,43 +245,76 @@ export const LogChart = ({
   const yFormatter = (value: number | null) =>
     value === null ? 'N/A' : `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
 
-  return useDate ? (
-    <ScatterChart
-      h={600}
-      data={parsedScatterData}
-      dataKey={{ x: useDate ? 'date' : 'run', y: splits ? 'split' : 'delta' }}
-      valueFormatter={{
-        x: (value) => (useDate ? new Date(value).toLocaleDateString() : value.toString()),
-        y: yFormatter,
-      }}
-      tooltipProps={{ content: <CustomTooltip formatter={yFormatter} /> }}
-      xAxisLabel={xAxisLabel}
-      xAxisProps={xAxisProps}
-      yAxisProps={{ tickCount: 11, domain: [() => minTime, () => maxTime] }}
-      withLegend
-      legendProps={{ verticalAlign: 'bottom' }}
-    />
-  ) : (
-    <CompositeChart
-      data={parsedLineData}
-      h={600}
-      dataKey="run"
-      series={lineChartSeries}
-      valueFormatter={(value) =>
-        value === null ? 'N/A' : `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, '0')}`
-      }
-      dotProps={{ r: 3 }}
-      lineProps={{ strokeWidth: 1 }}
-      yAxisProps={{ tickCount: 11, domain: [0, () => maxTime] }}
-      withLegend
-      legendProps={{ verticalAlign: 'bottom' }}
-      xAxisLabel="Task #"
-      referenceLines={[
-        { label: 'Sub 45', y: 2700, labelPosition: 'insideBottomRight', color: 'red' },
-        { label: 'Sub 50', y: 3000, labelPosition: 'insideBottomRight', color: 'red' },
-        { label: 'Sub 65', y: 3900, labelPosition: 'insideBottomRight', color: 'red' },
-    ]}
-    />
+  const title = generateTitle(lineType, selectedWaves, splits);
+
+  return (
+    <>
+      <Flex justify="center">
+        <Title order={4}>{title}</Title>
+      </Flex>
+      {useDate ? (
+        <ScatterChart
+          h={600}
+          data={parsedScatterData}
+          dataKey={{ x: useDate ? 'date' : 'run', y: splits ? 'split' : 'delta' }}
+          valueFormatter={{
+            x: (value) => (useDate ? new Date(value).toLocaleDateString() : value.toString()),
+            y: yFormatter,
+          }}
+          tooltipProps={{ content: <CustomTooltip formatter={yFormatter} /> }}
+          xAxisLabel={xAxisLabel}
+          xAxisProps={xAxisProps}
+          yAxisProps={{
+            tickCount: 11,
+            domain: [() => minTime, () => maxTime],
+            allowDataOverflow: false,
+          }}
+          withLegend
+          legendProps={{ verticalAlign: 'bottom' }}
+        />
+      ) : (
+        <CompositeChart
+          title="hello"
+          data={parsedLineData}
+          h={600}
+          dataKey="run"
+          series={lineChartSeries}
+          valueFormatter={(value) =>
+            value === null
+              ? 'N/A'
+              : `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, '0')}`
+          }
+          dotProps={{ r: 3 }}
+          lineProps={{ strokeWidth: 1 }}
+          xAxisProps={{
+            minTickGap: 10,
+            tickCount: 10,
+            tick: {
+              fill: 'white',
+              fontSize: 10,
+            },
+          }}
+          yAxisProps={{
+            tickCount: 11,
+            domain: autoZoom ? ['auto', 'auto'] : [() => minTime, () => maxTime],
+            allowDataOverflow: false,
+            includeHidden: false,
+            tick: {
+              fill: 'white',
+              fontSize: 12,
+            },
+          }}
+          withLegend
+          legendProps={{ verticalAlign: 'bottom' }}
+          xAxisLabel="Task #"
+          referenceLines={[
+            { label: 'Sub 45', y: 2700, labelPosition: 'insideBottomRight', color: 'red' },
+            { label: 'Sub 50', y: 3000, labelPosition: 'insideBottomRight', color: 'red' },
+            { label: 'Sub 65', y: 3900, labelPosition: 'insideBottomRight', color: 'red' },
+          ]}
+        />
+      )}
+    </>
   );
 };
 
@@ -309,3 +349,35 @@ const CustomTooltip = ({
   }
   return null;
 };
+
+function generateTitle(
+  lineType: string,
+  selectedWaves: { [wave: string]: boolean },
+  splits: boolean
+) {
+  let result = '';
+  switch (lineType) {
+    case LINE_TYPES.PB:
+        result += 'Personal Best ';
+        break;
+    case LINE_TYPES.MOVING_AVERAGE:
+        result += 'Moving Average ';
+        break;
+  }
+
+  result += splits ? 'Splits' : 'Wave Deltas';
+
+  const actualWaves = Object.entries(selectedWaves).filter(([, selected]) => selected);
+  if (actualWaves.length < 3) {
+    let first = true;
+    actualWaves.forEach(([wave]) => {
+        const splitName = (SPLIT_NAMES as any)[wave];
+        if (splitName) {
+            result += ` ${first ? 'to' : 'and'} ${splitName}`;
+            first = false;
+        }
+    });
+  }
+
+  return result;
+}

@@ -23,6 +23,23 @@ export const SPLIT_WAVE_COLORS: { [wave: string]: string } = {
   '62': 'red',
 };
 
+// only inferno right now
+export const SPLIT_NAMES = {
+  '9': 'Melee',
+  '18': 'Ranger',
+  '25': 'Melee/Ranger',
+  '35': 'Mage',
+  '42': 'Mage/Melee',
+  '50': 'Mage/Ranger',
+  '57': 'Mage/Ranger/Melee',
+  '60': 'Mage/Range/Melee/Blob',
+  '63': 'Mage/Range/Melee/2Blobs',
+  '66': 'Mage/Mage',
+  '67': 'Jad',
+  '68': 'Triples',
+  '69': 'Zuk',
+};
+
 export type Splits = { [wave: string]: number | null };
 
 export type Log = {
@@ -35,7 +52,7 @@ export type Log = {
 };
 
 export const LINE_TYPES = {
-    RUN: 'Actual time',
-    PB: 'PB Improvement',
-    MOVING_AVERAGE: 'Moving Average',
+  RUN: 'Actual time',
+  PB: 'PB Improvement',
+  MOVING_AVERAGE: 'Moving Average',
 } as const;
