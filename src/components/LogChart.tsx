@@ -53,7 +53,7 @@ const toScatterChartData = (
       });
     });
     // add the completion time for successes only
-    if (selectedWaves.last && success && duration < maxTimeSeconds) {
+    if (selectedWaves.last && success && duration < excludeRunsAbove) {
       getOrCreateSeries('last', colorScheme === 'dark' ? 'white' : 'black').data.push({
         split: duration,
         delta: calculateLastWaveTime(success, duration, splits)!,
@@ -261,7 +261,7 @@ export const LogChart = ({
       dataKey="run"
       series={lineChartSeries}
       valueFormatter={(value) =>
-        value === null ? 'N/A' : `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`
+        value === null ? 'N/A' : `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, '0')}`
       }
       dotProps={{ r: 3 }}
       lineProps={{ strokeWidth: 1 }}

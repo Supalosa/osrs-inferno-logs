@@ -116,7 +116,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
         </Paper>
         <Paper shadow="xs" withBorder p="xs">
           <Group>
-            <Text size="sm">Exclude runs above:</Text>
+            <Text size="sm">Exclude runs above (mins):</Text>
             <NumberInput
               value={Math.floor(excludeRunsAbove / 60)}
               min={0}
