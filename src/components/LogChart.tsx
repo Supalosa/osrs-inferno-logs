@@ -18,8 +18,7 @@ const calculateLastWaveTime = (
 const toScatterChartData = (
   parsedLogs: Log[],
   selectedWaves: { [wave: string]: boolean },
-  minTimeSeconds: number,
-  maxTimeSeconds: number,
+  excludeRunsAbove: number,
   colorScheme: string
 ) => {
   const waveList = Object.keys(selectedWaves);
@@ -42,7 +41,7 @@ const toScatterChartData = (
       if (!selectedWaves[wave]) {
         return;
       }
-      if (value! < minTimeSeconds || value! > maxTimeSeconds) {
+      if (value! > excludeRunsAbove) {
         return;
       }
       const series = getOrCreateSeries(wave);
@@ -67,10 +66,14 @@ const toScatterChartData = (
 };
 
 const processSplits = (parsedLogs: Log[], lineType: string) => {
-  const pbSplits: { [wave: string]: number } = {};
-  const pbDeltas: { [wave: string]: number } = {};
+  const _splits: { [wave: string]: number } = {};
+  const _deltas: { [wave: string]: number } = {};
   let pbSuccess: number = Number.MAX_SAFE_INTEGER;
   let pbLastWave: number = Number.MAX_SAFE_INTEGER;
+
+  const range = 10;
+  const k = 2 / (range + 1);
+
   switch (lineType) {
     case LINE_TYPES.PB:
       return parsedLogs.map(({ splits, deltas, success, duration }) => {
@@ -78,15 +81,15 @@ const processSplits = (parsedLogs: Log[], lineType: string) => {
         const newDeltas: { [wave: string]: number } = {};
         // only add an entry if we actually pb'd a split/delta
         Object.entries(splits).forEach(([wave, time]) => {
-          if (time && (!pbSplits[wave] || time < pbSplits[wave])) {
+          if (time && (!_splits[wave] || time < _splits[wave])) {
             newSplits[wave] = time;
-            pbSplits[wave] = time;
+            _splits[wave] = time;
           }
         });
         Object.entries(deltas).forEach(([wave, time]) => {
-          if (time && (!pbDeltas[wave] || time < pbDeltas[wave])) {
+          if (time && (!_deltas[wave] || time < _deltas[wave])) {
             newDeltas[wave] = time;
-            pbDeltas[wave] = time;
+            _deltas[wave] = time;
           }
         });
         if (success && (duration < pbSuccess)) {
@@ -100,6 +103,33 @@ const processSplits = (parsedLogs: Log[], lineType: string) => {
         }
         return { success, duration, splits: newSplits, deltas: newDeltas };
       });
+    case LINE_TYPES.MOVING_AVERAGE:
+        return parsedLogs.map(({ splits, deltas, success, duration }, i) => {
+            if (i === 0) {
+                Object.entries(splits).forEach(([wave, time]) => {
+                    _splits[wave] = time!;
+                });
+                Object.entries(deltas).forEach(([wave, time]) => {
+                    _deltas[wave] = time!;
+                });
+                return { success, duration, splits, deltas };
+            }
+
+            const newSplits: { [wave: string]: number } = {};
+            const newDeltas: { [wave: string]: number } = {};
+            Object.entries(splits).forEach(([wave, time]) => {
+                const emaValue = time! * k + (_splits[wave] ?? time) * (1 - k);
+                newSplits[wave] = emaValue;
+                _splits[wave] = emaValue;
+            });
+            Object.entries(deltas).forEach(([wave, time]) => {
+                const emaValue = time! * k + (_deltas[wave] ?? time) * (1 - k);
+                newDeltas[wave] = emaValue;
+                _deltas[wave] = emaValue;
+            });
+
+            return { success, duration, splits: newSplits, deltas: newDeltas };
+        });
     case LINE_TYPES.RUN:
     default:
       return parsedLogs.map(({ splits, deltas, success, duration }) => ({
@@ -119,11 +149,10 @@ const toLineChartData = (
   parsedLogs: Log[],
   showSplits: boolean,
   lineType: string,
-  minRunLength: number,
-  maxRunLength: number
+  excludeRunsAbove: number
 ) => {
   const processedLogs = processSplits(
-    parsedLogs.filter(({ duration }) => duration >= minRunLength && duration <= maxRunLength),
+    parsedLogs.filter(({ duration }) => duration <= excludeRunsAbove),
     lineType
   );
   return processedLogs.map(({ splits, deltas }, run) => ({
@@ -137,6 +166,7 @@ type LogChartProps = {
   selectedWaves: { [wave: string]: boolean };
   minTime: number;
   maxTime: number;
+  excludeRunsAbove: number;
   useDate: boolean;
   splits: boolean;
   lineType: string;
@@ -147,6 +177,7 @@ export const LogChart = ({
   selectedWaves,
   minTime,
   maxTime,
+  excludeRunsAbove,
   useDate,
   splits,
   lineType,
@@ -162,15 +193,14 @@ export const LogChart = ({
         ? toScatterChartData(
             logs,
             selectedWaves,
-            minRunLength,
-            maxRunLength,
+            excludeRunsAbove,
             colorScheme.colorScheme
           )
         : [],
     [useDate, logs, minRunLength, maxRunLength, colorScheme, selectedWaves]
   );
   const parsedLineData = useMemo(
-    () => (!useDate ? toLineChartData(logs, splits, lineType, minRunLength, maxRunLength) : []),
+    () => (!useDate ? toLineChartData(logs, splits, lineType, excludeRunsAbove) : []),
     [logs, lineType, minRunLength, maxRunLength, colorScheme, selectedWaves]
   );
   const uniqueWaves = Object.keys(selectedWaves);

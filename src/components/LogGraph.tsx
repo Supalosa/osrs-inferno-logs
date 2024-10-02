@@ -5,6 +5,7 @@ import {
   Divider,
   Flex,
   Group,
+  NumberInput,
   Paper,
   RangeSlider,
   Select,
@@ -45,6 +46,8 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
   // because the RangeSlider is controlled, we need a value that is updated as we drag (but before onChangeEnd)
   const [visualTimeRange, setVisualTimeRange] = useState([defaultMinTime, defaultMaxTime]);
   const [[minTime, maxTime], setTimeRange] = useState([defaultMinTime, defaultMaxTime]);
+
+  const [excludeRunsAbove, setExcludeRunsAbove] = useState(70 * 60);
 
   const timeRangeMarks = (
     splits ? _.range(defaultMinTime, defaultMaxTime + 1, 300) : _.range(0, 601, 60)
@@ -92,18 +95,35 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
             />
           </Group>
         </Paper>
-        <Paper shadow="xs" withBorder p="xs" miw="450px">
-          <RangeSlider
-            label={(v) => Math.floor(v / 60)}
-            value={[visualTimeRange[0], visualTimeRange[1]]}
-            onChange={([min, max]) => setVisualTimeRange([min, max])}
-            onChangeEnd={([min, max]) => setTimeRange([min, max])}
-            step={splits ? 300 : 60}
-            min={splits ? defaultMinTime : 0}
-            max={splits ? defaultMaxTime : 600}
-            marks={timeRangeMarks}
-            size="sm"
-          />
+        <Paper shadow="xs" withBorder p="xs" miw="450px" flex="1">
+          <Group>
+            <Text size="sm" flex="0">
+              Zoom:
+            </Text>
+            <RangeSlider
+              label={(v) => Math.floor(v / 60)}
+              value={[visualTimeRange[0], visualTimeRange[1]]}
+              onChange={([min, max]) => setVisualTimeRange([min, max])}
+              onChangeEnd={([min, max]) => setTimeRange([min, max])}
+              step={splits ? 300 : 60}
+              min={splits ? defaultMinTime : 0}
+              max={splits ? defaultMaxTime : 600}
+              marks={timeRangeMarks}
+              size="sm"
+              flex="1"
+            />
+          </Group>
+        </Paper>
+        <Paper shadow="xs" withBorder p="xs">
+          <Group>
+            <Text size="sm">Exclude runs above:</Text>
+            <NumberInput
+              value={Math.floor(excludeRunsAbove / 60)}
+              min={0}
+              max={100}
+              onChange={(v) => setExcludeRunsAbove(parseInt(v.toString(), 10) * 60)}
+            />
+          </Group>
         </Paper>
         <Paper shadow="xs" withBorder p="xs">
           <Group>
@@ -151,6 +171,7 @@ export const LogGraph = ({ logs }: { logs: Log[] }) => {
         selectedWaves={selectedWaves}
         minTime={minTime}
         maxTime={maxTime}
+        excludeRunsAbove={excludeRunsAbove}
         useDate={useDate}
         splits={splits}
         lineType={lineType}
